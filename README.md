@@ -250,6 +250,32 @@ rescue => e
 end
 ```
 
+#### Extracting Plain Text Content
+
+For text processing, you might want to extract clean text from XHTML chapters:
+
+```ruby
+require 'nokogiri'
+
+book = GEPUB::Book.parse('path/to/book.epub')
+
+def extract_text(xhtml_content)
+  # Parse HTML and extract text content
+  doc = Nokogiri::HTML(xhtml_content)
+  text = doc.css('body').text
+  # Clean up whitespace
+  text.gsub(/\s+/, ' ').strip
+end
+
+# Extract text from all chapters
+book.spine_items.each_with_index do |item, index|
+  if item.media_type == 'application/xhtml+xml'
+    text = extract_text(item.content)
+    puts "Chapter #{index + 1}: #{text[0..100]}..." unless text.empty?
+  end
+end
+```
+
 #### Working with Different EPUB Versions
 
 GEPUB automatically handles both EPUB2 and EPUB3 formats. The parsing interface remains the same, but some features may vary:
