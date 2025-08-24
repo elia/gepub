@@ -103,6 +103,173 @@ book.generate_epub(epubname)
 ```
  * [examples in this repository](https://github.com/skoji/gepub/tree/main/examples/) 
 
+### Parsing and Reading EPUB Files
+
+GEPUB can also parse existing EPUB files to extract metadata, content, and structure.
+
+#### Basic Parsing
+
+```ruby
+require 'gepub'
+
+# Parse an EPUB file (works with file path or IO object)
+book = GEPUB::Book.parse('path/to/your/book.epub')
+
+# Or with an IO object
+File.open('path/to/your/book.epub', 'rb') do |file|
+  book = GEPUB::Book.parse(file)
+end
+```
+
+#### Accessing Metadata
+
+```ruby
+# Basic metadata
+puts book.title        # Book title
+puts book.creator       # Primary author/creator
+puts book.language      # Language code (e.g., "en-US")
+puts book.identifier    # Unique identifier
+puts book.publisher     # Publisher (may be nil)
+puts book.date          # Publication date (may be nil)
+puts book.description   # Description (may be nil)
+puts book.subject       # Subject/topic (may be nil)
+```
+
+#### Accessing Book Structure and Content
+
+```ruby
+# Get all items (chapters, images, stylesheets, etc.)
+book.items.each do |item_id, item|
+  puts "#{item_id}: #{item.href} (#{item.media_type})"
+end
+
+# Get the reading order (spine)
+book.spine_items.each_with_index do |item, index|
+  puts "Chapter #{index + 1}: #{item.href}"
+end
+
+# Access content of a specific item
+first_chapter = book.spine_items.first
+content = first_chapter.content
+puts "Content: #{content[0..200]}..."  # First 200 characters
+
+# Access images and other resources
+book.items.each do |item_id, item|
+  if item.media_type.start_with?('image/')
+    puts "Image: #{item.href} (#{item.content.length} bytes)"
+  end
+end
+```
+
+#### Working with Navigation
+
+```ruby
+# Access the navigation document (EPUB3) or NCX file (EPUB2)
+nav_item = book.items.values.find { |item| 
+  item.media_type == 'application/xhtml+xml' && 
+  (item.properties&.include?('nav') || item.href.include?('nav'))
+}
+
+if nav_item
+  nav_content = nav_item.content
+  puts "Navigation document: #{nav_item.href}"
+end
+```
+
+#### Complete Example: Reading an EPUB from Start to Finish
+
+```ruby
+require 'gepub'
+
+def read_epub(epub_path)
+  # Parse the EPUB file
+  book = GEPUB::Book.parse(epub_path)
+  
+  # Display basic information
+  puts "=" * 50
+  puts "EPUB Information"
+  puts "=" * 50
+  puts "Title: #{book.title}"
+  puts "Author: #{book.creator}"
+  puts "Language: #{book.language}"
+  puts "Identifier: #{book.identifier}"
+  puts "Publication Date: #{book.date}" if book.date
+  puts
+  
+  # Show book structure
+  puts "Book Structure (#{book.spine_items.length} chapters):"
+  puts "-" * 30
+  book.spine_items.each_with_index do |item, index|
+    puts "#{index + 1}. #{item.href}"
+  end
+  puts
+  
+  # Show all resources
+  puts "All Resources (#{book.items.length} items):"
+  puts "-" * 30
+  content_types = {}
+  book.items.each do |item_id, item|
+    content_types[item.media_type] ||= []
+    content_types[item.media_type] << item.href
+  end
+  
+  content_types.each do |media_type, files|
+    puts "#{media_type}:"
+    files.each { |file| puts "  - #{file}" }
+  end
+  puts
+  
+  # Read and display content from each chapter
+  puts "Chapter Contents:"
+  puts "-" * 30
+  book.spine_items.each_with_index do |item, index|
+    puts "Chapter #{index + 1}: #{item.href}"
+    content = item.content
+    
+    # Extract text content (basic HTML stripping for display)
+    text_content = content.gsub(/<[^>]*>/, '').strip
+    preview = text_content[0..200].gsub(/\s+/, ' ')
+    puts "  Preview: #{preview}#{'...' if text_content.length > 200}"
+    puts "  Full length: #{content.length} characters"
+    puts
+  end
+end
+
+# Usage
+read_epub('path/to/your/book.epub')
+```
+
+#### Error Handling
+
+```ruby
+begin
+  book = GEPUB::Book.parse('path/to/book.epub')
+  puts "Successfully parsed: #{book.title}"
+rescue => e
+  puts "Error parsing EPUB: #{e.message}"
+end
+```
+
+#### Working with Different EPUB Versions
+
+GEPUB automatically handles both EPUB2 and EPUB3 formats. The parsing interface remains the same, but some features may vary:
+
+```ruby
+book = GEPUB::Book.parse('path/to/book.epub')
+
+# Check EPUB version
+puts "EPUB Version: #{book.version}"
+
+# EPUB3 books may have additional features
+if book.version.to_f >= 3.0
+  # Look for navigation document
+  nav_item = book.items.values.find { |item| 
+    item.properties&.include?('nav')
+  }
+  puts "Navigation document: #{nav_item.href}" if nav_item
+end
+```
+
 ## INSTALL:
 
 * gem install gepub
